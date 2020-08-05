@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.slim.js"></script>
+
+<meta charset="utf-8">
+<title>Display Webcam Stream</title>
+ 
+<style>
+#container {
+	display:none;
+	margin: 0px auto;
+	width: 500px;
+	height: 375px;
+	border: 10px #333 solid;
+}
+#videoElement {
+	width: 500px;
+	height: 375px;
+	background-color: #666;
+}
+#canvas {
+	width: 20%;
+	height:10%;
+	position:absolute;
+	right:0;
+	bottom:0;
+	z-index:10;
+	background-color: #444;
+}
+#canvas2 {
+	position:absolute;
+	left:0;
+	top:0;
+	width: 100%;
+	height:100%;
+	background-color: #666;
+}
+#renderer {
+	width: 500px;
+	height:400px;
+	background-color: #666;
+	display:none;
+}
+#menu {
+float:left;
+	display:none;
+	position:relative;
+	top:50px;
+	width:100%;
+	background-color:rgba(200,200,200,100);
+	}
+
+#myResDiv {
+	display:block;
+	width:100%;
+}
+#sendResDiv {
+	display:block;
+	width:100%;
+}
+#myResDesc, #sendResDesc {
+	margin-top:10px;
+	margin-bottom:5px;
+}
+#myRes, #sendRes {
+float:left;
+	width:50%;
+	height:50px;
+	font-size:20px;
+}
+#myResIncr, #myResDcr, #sendResIncr, #sendResDcr {
+	width:50px;
+	height:50px;
+	float:left;
+	margin:8px;
+	background-color:#771000;
+}
+.menuContainer {
+	position:relative;
+	top:0;
+	width:100%;
+	height:100%;
+	z-index:10;
+}
+.menuButton {
+	text-align:center;
+	font-size:47px;
+	float:right;
+	width:50px;
+	height:50px;
+	background-color:rgba(255,255,255,100);
+}
+	#p{display:;}
+
+</style>
+</head>
+ 
+<body>
+<div id="container">
+	<video autoplay="true" id="videoElement">
+	
+	</video>
+</div>
+<canvas id="canvas2" ></canvas>
+<canvas id="canvas" ></canvas>
+<canvas id="renderer" ></canvas>
+
+<div class="menuContainer">
+<center>
+<div class="menuButton" onclick="expandMenu()">lll</div>
+<div id="menu">
+<div id="myResDiv"><p id="myResDesc">Receiving Resolution</p>
+<input id="myRes" onchange="setMyRes(this)">
+<div id="myResIncr" ></div>
+<div id="myResDcr" ></div>
+</div>
+<br><br>
+<div id="sendResDiv"><p id="sendResDesc">Sending Resolution</p>
+<input id="sendRes" onchange="setSendRes(this)">
+<div id="sendResIncr" ></div>
+<div id="sendResDcr" ></div>
+</div>
+<p id="p"></p> 
+</div>
+</center>
+</div>
+
+<script>
+
+myId="";
+
+resolutionWidth=360;
+resolutionHeight=480;
+
+canvas = document.getElementById('canvas');
+canvas2 = document.getElementById('canvas2');
+ctx1 = canvas.getContext('2d');
+ctx2 = canvas2.getContext('2d');
+p = document.getElementById('p');
+myRes = document.getElementById('myRes');
+sendRes = document.getElementById('sendRes');
+menu = document.getElementById('menu');
+
+function setMyRes(e){
+	receiveScale=e.value;
+	//alert(e.value);
+}
+function setSendRes(e){
+	sendScale=e.value;
+	//alert(e.value);
+}
+function expandMenu(){
+	if(menu.style.display!="block"){
+		menu.style.display="block";
+	}else{
+		menu.style.display="none";
+	}
+}
+expandMenu();
+
+renderer = document.getElementById('renderer');
+        
+frameRate=10;
+scale=1;
+sendScale='100-50';
+receiveScale='50-50';
+
+myRes.value=receiveScale;
+sendRes.value=sendScale;
+
+canvas.width=resolutionWidth;
+canvas.height=resolutionHeight;
+canvas2.width=resolutionWidth;
+canvas2.height=resolutionHeight;
+
+var video = document.querySelector("#videoElement");
+	socket = io.connect('http://11.100.52.133:5001', { 'connect timeout': 5000 });
+	socket.on( 'connect_failed', function() {
+	socket = io.connect('https://videopersonal.serverless.social/');
+	
+	});
+	socket.on('connected',function(dat2){
+	p.textContent=(dat2);
+	myId=dat2;
+	});
+	socket.on('onlineQuery',function(data){
+		//p.textContent=(data);
+		socket.emit('yesOnline',data);
+	
+	});
+	
+	socket.on('returnData',function(dat){
+	
+	dat=JSON.parse(dat);
+	count=2;
+	for(x in dat){
+	if(myId==x){
+	returnBasesf=dat[x]['imgData'];
+	rcvSendScale=dat[x]['rcvMySendScale'];
+	convertedScale=dat[x]['convertedScale'];
+	var pix=returnBasesf.split(',');
+	px=[];
+	     pxNum=0
+	     for(i=0;i<pix.length;i+=1){
+	         q=pix[i];
+	
+	         if(q.length>3){
+	             iter=parseInt(q.slice(3,));
+	             for(j=0;j<iter;j++){
+	                 px.push(''+q.slice(0,3));
+	                 //console.log(pxNum+' '+q.slice(0,
+					 if((pxNum+1)%3==0)px.push('255');
+					 
+	                 pxNum++;
+	             }
+	         }else{
+	
+	             px.push(q);
+	             //console.log(pxNum+' '+q.slice(0,3));
+				 if((pxNum+1)%3==0)px.push('255');
+				 
+	             pxNum++;
+	         }
+	     }
+	//p.textContent=px.length.toString();//returnBasesf.split(',').length;;
+	//alert(px.length);
+	createData(getCtx(count),px,rcvSendScale,convertedScale);
+	count++;
+	}
+	//p.innerHTML+='rcv: '+x+'<br>my: '+myId+'<br><br>';
+	}
+	});
+		
+if (navigator.mediaDevices.getUserMedia) {
+  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    .then(function (stream) {
+      video.srcObject = stream;
+      
+      var audioInput = context.createMediaStreamSource(stream);
+      var bufferSize = 2048;
+      
+      recorder = context.createScriptProcessor(bufferSize, 1, 1);
+      
+      recorder.onaudioprocess = onAudio;
+      
+      audioInput.connect(recorder);
+      
+      recorder.connect(context.destination);
+      
+      
+    })
+    .catch(function (err0r) {
+      console.log("Something went wrong!");
+    });
+}
+
+function onAudio(e) {
+
+          if(!broadcast) return;
+
+          var mic = e.inputBuffer.getChannelData(0);
+
+          var converted = convertFloat32ToInt16(mic);
+
+          //socket.emit('broadcast', converted);
+          
+          var buffer = convertInt16ToFloat32(raw);
+          
+          var src = context.createBufferSource();
+          var audioBuffer = context.createBuffer(1, buffer.byteLength, context.sampleRate);
+          
+          audioBuffer.getChannelData(0).set(buffer);
+          
+          src.buffer = audioBuffer;
+          
+          src.connect(context.destination);
+          
+          src.start(0);
+      }
+
+video.addEventListener('play', function () {
+    var $this = this; //cache
+    (function loop() {
+    
+        if (!$this.paused && !$this.ended) {
+        renderer.width = resolutionWidth;
+        renderer.height = resolutionHeight;
+        rCtx=renderer.getContext('2d');
+        rCtx.scale(sendScale.split('-')[0]/resolutionWidth,sendScale.split('-')[1]/resolutionHeight);
+        
+        // render our ImageData on this canvas
+        rCtx.drawImage($this, 0, 0, resolutionWidth, resolutionHeight);// sendScale.split('-')[0], sendScale.split('-')[1]);
+        
+        
+        ctx1.drawImage($this, 0, 0, resolutionWidth	, resolutionHeight);
+        bsf=canvas.toDataURL('image/png');//
+        strr=[];
+        bsff=rCtx.getImageData(0,0,sendScale.split('-')[0], sendScale.split('-')[1]).data;
+        //while(match=/(.+?)[,|$]/.exec(bsff)){
+        lastVal='99999';
+        arrLen=0;
+        for(i=0;i<bsff.length;i+=1){
+        	if((i+1)%4!=0){
+        	m=bsff[i].toString();
+        	if(m.length==3){
+        		if(m==lastVal){
+        			last = parseInt(strr[arrLen-1].slice(3,));
+        			if(!last)last=1;
+        			strr[arrLen-1]=m+(last+1);
+        			//alert(strr[arrLen-1]);
+        			lastVal=m;
+        			}else{
+        			strr.push(m);
+        			lastVal=m;
+        			arrLen+=1;
+        			}
+        		}
+        	if(m.length==2){
+        	m='0'+m;
+				if(m==lastVal){
+        			last = parseInt(strr[arrLen-1].slice(3,));
+        			if(!last)last=1;
+        			strr[arrLen-1]=m+(last+1);
+        			//alert(strr[arrLen-1]);
+        			lastVal=m;
+        			}else{
+        			strr.push(m);
+        			lastVal=m;
+        			arrLen+=1;
+        			}
+        		}
+        	if(m.length==1){
+        	m='00'+m;
+        	if(m==lastVal){
+        	last = parseInt(strr[arrLen-1].slice(3,));
+        	if(!last)last=1;
+        	strr[arrLen-1]=m+(last+1);
+        	//alert(strr[arrLen-1]);
+        	lastVal=m;
+        	}else{
+        	strr.push(m);
+        	lastVal=m;
+        	arrLen+=1;
+        	}
+        	}
+        
+        }
+        	//bsff=bsff.replace(match[0],'');
+        	//alert(m+' '+strr);
+        	//p.textContent=m.length+strr;
+        	//alert(bsff);
+        	//break;
+        	
+        };
+
+        bsff=strr.toString();
+        //p.textContent=bsff;
+        //alert('done');
+        
+        //resolutionWidth,resolutionHeight).data.toString());
+        //alert(bsff.split(',').length);
+        sendToServer((bsff));//renderer.toDataURL('image/png'));
+        //alert(JSON.stringify());
+        rCtx.scale(resolutionWidth/sendScale.split('-')[0],resolutionHeight/sendScale.split('-')[1]);
+        //ctx1.drawImage(ctx1.canvas, 0, 0, resolutionWidth*5, resolutionHeight*5);
+        
+            
+            
+            //drawToCanvas(ctx1,bsf);
+            
+            setTimeout(loop, 1000 / frameRate); // drawing at 30fps
+        }
+    })();
+}, 0);
+function getCtx(n){
+	if(!window.hasOwnProperty('ctx'+n)){
+		window['canvas'+n] = document.createElement('canvas');
+		
+		window['canvas'+n].id = "canvas"+n;
+		window['canvas'+n].width = 500;
+		window['canvas'+n].height = 400;
+		window['canvas'+n].style.backgroundColor="#666";
+		//canvas.style.zIndex = 8;
+		//canvas.style.position = "absolute";
+		//canvas.style.border = "1px solid";
+		
+		
+		var body = document.getElementsByTagName("body")[0];
+		body.appendChild(window['canvas'+n]);
+		
+		cursorLayer = document.getElementById("canvas"+n);
+		
+		console.log(cursorLayer);
+		window['ctx'+n] = window['canvas'+n].getContext("2d");
+		
+		return ctx;
+	}else{
+		return window['ctx'+n];
+	}
+}
+function drawToCanvas2(contx,basesf){
+	var image = new Image();
+	//p.textContent=basesf;
+	image.onload = function() {
+	
+	var canvas = contx.canvas;
+	var newImage = contx.createImageData(resolutionWidth, resolutionHeight);
+	var arr = contx.getImageData(0, 0, resolutionWidth, resolutionHeight);
+	var pixels = arr.data;
+	/*
+	for(var i = 0; i < pixels.length; i+=4){
+	var r = 255 - pixels[i];
+	var g = 255 - pixels[i + 1];
+	var b = 255 - pixels[i + 2];
+	var a = pixels[i + 3];
+	newImage.data[i] = r;
+	newImage.data[i + 1] = g;
+	newImage.data[i + 2] = b;
+	newImage.data[i + 3] = a;
+	}*/
+	
+	contx.clearRect(0, 0, resolutionWidth, resolutionHeight);
+	//contx.putImageData(newImage, 0, 0);
+	contx.drawImage(image,0,0);
+	//p.textContent=newImage.data[3];
+	
+	}
+	image.src = basesf;
+}
+async function drawToCanvas(contx,basesf,rcvSS,convScl){
+	
+	/*var canvas=contx.canvas;
+	h=await contx.createImageData(resolutionWidth,resolutionHeight);
+	hd=await JSON.parse(basesf).data;
+	//hd =await (new Uint8ClampedArray(hd));
+	hd = await Object.keys(hd).map(function(key) {
+	return hd[key];
+	});
+	//dat= rCtx.getImageData(0,0,resolutionWidth*0.2,resolutionHeight*0.2);
+	//dat.data.set(new Uint8ClampedArray(dat['data']));
+	//image = new Image();
+	
+	
+	
+	/////////////////////////////////////////////errordown not print
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	//image.onload = function() {
+	
+	var canvas = contx.canvas;
+	
+	/*
+	renderer = document.createElement('canvas');
+	renderer.width = resolutionWidth;
+	renderer.height = resolutionHeight;
+	renderer.getContext('2d').scale(5,5);
+	
+	// render our ImageData on this canvas
+	renderer.getContext('2d').drawImage(image, 0, 0, resolutionWidth, resolutionHeight);
+	*/
+	//p.textContent=JSON.stringify({});
+	
+	//contx.putImageData(h,0,0);//(( rCtx.getImageData(0,0,resolutionWidth*0.2,resolutionHeight*0.2) )),0,0);
+	
+	hd=basesf.split(',');
+	createData(contx,hd,rcvSS,convScl);
+	
+	
+	
+	//var bsf=renderer.toDataURL('image/png');
+	
+	//sendToServer(renderer.toDataURL('image/png'));
+	//renderer.getContext('2d').scale(0.2,0.2);
+	//ctx1.drawImage(ctx1.canvas, 0, 0, resolutionWidth*5, resolutionHeight*5);
+	
+	
+	//createData(contx);
+	//var canvas = contx.canvas;
+	//var newImage = contx.createImageData(resolutionWidth, resolutionHeight);
+	//var arr = contx.getImageData(0, 0, resolutionWidth, resolutionHeight);
+	//var pixels = arr.data;
+	/*
+	for(var i = 0; i < pixels.length; i+=4){
+	var r = 255 - pixels[i];
+	var g = 255 - pixels[i + 1];
+	var b = 255 - pixels[i + 2];
+	var a = pixels[i + 3];
+	newImage.data[i] = r;
+	newImage.data[i + 1] = g;
+	newImage.data[i + 2] = b;
+	newImage.data[i + 3] = a;
+	}
+	
+	//contx.drawImage(image,0,0);
+	contx.drawImage(image, 0, 0, resolutionWidth*5, resolutionHeight*5);
+	//p.textContent=newImage.data[3];
+	*/
+	//}
+	//image.src = basesf;
+	
+	
+	
+	//obj=(basesf);
+	//contx.drawImage(image,0,0);
+	
+	//alert(bsf);
+	/*p.textContent=(JSON.stringify(bsf).length);
+	obj=(basesf);
+	
+ 	//contx.scale(1/scale,1/scale);
+	contx.putImageData(bsf,0,0);//,resolutionWidth,resolutionHeight);
+	
+	*/
+	
+}
+async function sendToServer(s,scale) {
+ 	
+ 	
+	data = {
+		'imgData' : s,
+		'rcvScale' : receiveScale, //i want this scale
+		'rcvMySendScale' : sendScale //i am sending this scale
+		
+	};
+	//alert(s);
+	
+	socket.emit('data',JSON.stringify(data));
+}
+async function createData(contx,pix,rcvSendScl,convScl){
+	var canvas = contx.canvas;
+	/*
+	var renderer = document.createElement('canvas');
+	renderer.width = resolutionWidth;
+	renderer.height = resolutionHeight;
+	// render our ImageData on this canvas
+	renderer.getContext('2d').drawImage(image, 0, 0);
+	*/
+	//contx.drawImage(image,0,0);
+	//alert(pix);
+	var newImage = await new ImageData(convScl.split('-')[0], convScl.split('-')[1]);
+	//var arr = await ctx1.getImageData(0, 0, resolutionWidth, resolutionHeight);
+	var pixels = pix;// arr.data;
+	contx.clearRect(0, 0, resolutionWidth, resolutionHeight);
+	
+	
+	for(var i = 0; i < pixels.length; i+=4){
+	var r =  pixels[i];
+	var g = pixels[i + 1];
+	var b = pixels[i + 2];
+	var a = pixels[i + 3];
+	newImage.data[i] = r;
+	newImage.data[i + 1] = g;
+	newImage.data[i + 2] = b;
+	newImage.data[i + 3] = a;
+	}
+	
+	p.textContent=/*JSON.stringify*/(newImage.data.length+'ret'+(pix.length/4));
+	//contx.clearRect(0, 0, resolutionWidth, resolutionHeight);
+	newImage.data=pixels;
+	
+
+	
+	contx.putImageData(newImage,0,0);//,resolutionWidth,resolutionHeight);
+	contx.scale(canvas.width/convScl.split('-')[0],canvas.height/convScl.split('-')[1]);
+	contx.drawImage(contx.canvas,0,0);
+	contx.scale(convScl.split('-')[0]/canvas.width,convScl.split('-')[1]/canvas.height);
+}
+</script>
+</body>
+</html>
